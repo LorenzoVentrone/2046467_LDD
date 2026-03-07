@@ -26,7 +26,8 @@ class ConnectionManager:
         for ws in self._connections:
             try:
                 await ws.send_text(message)
-            except Exception:
+            except Exception as exc:
+                logger.debug("WS send failed, dropping client: %s", exc)
                 dead.add(ws)
         for ws in dead:
             self._connections.discard(ws)

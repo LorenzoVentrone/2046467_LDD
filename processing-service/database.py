@@ -17,7 +17,9 @@ CREATE TABLE IF NOT EXISTS rules (
 
 
 async def init_db():
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    dir_ = os.path.dirname(DB_PATH)
+    if dir_:
+        os.makedirs(dir_, exist_ok=True)
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(CREATE_TABLE)
         await db.commit()

@@ -10,7 +10,7 @@ services:
       retries: 10
 
   redpanda:
-    image: redpandadata/redpanda:latest
+    image: redpandadata/redpanda:v24.2.7
     command:
       - redpanda
       - start
@@ -36,7 +36,7 @@ services:
       retries: 20
 
   redpanda-init:
-    image: redpandadata/redpanda:latest
+    image: redpandadata/redpanda:v24.2.7
     depends_on:
       redpanda:
         condition: service_healthy
@@ -75,12 +75,13 @@ services:
     restart: unless-stopped
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        - VITE_API_URL=http://localhost:8001
+        - VITE_WS_URL=ws://localhost:8001
     ports:
       - "3000:80"
-    environment:
-      - VITE_API_URL=http://localhost:8001
-      - VITE_WS_URL=ws://localhost:8001
     depends_on:
       - processing-service
     restart: unless-stopped
