@@ -68,64 +68,93 @@ def normalize(sensor_id: str, source_type: str, raw_schema: str, payload: dict) 
 # ── Schema handlers ────────────────────────────────────────────────────────────
 
 def _scalar(p: dict) -> dict:
+    # rest.scalar.v1: { sensor_id, captured_at, metric, value, unit, status }
     return {
-        "timestamp": p.get("timestamp", _now_iso()),
+        "timestamp": p.get("captured_at", p.get("timestamp", _now_iso())),
         "value": float(p.get("value", 0)),
         "unit": p.get("unit", ""),
-        "metadata": {},
+        "metadata": {"status": p.get("status", "ok"), "metric": p.get("metric", "")},
     }
 
 
 def _chemistry(p: dict) -> dict:
-    meta = {}
-    for key in ("category", "concentration_category", "status", "level"):
+    # rest.chemistry.v1: { sensor_id, captured_at, measurements: [{metric, value, unit}], status }
+    # Extract the primary measurement value from the measurements array
+    measurements = p.get("measurements", [])
+    value = 0.0
+    unit = ""
+    meta = {"status": p.get("status", "ok")}
+
+    if measurements and len(measurements) > 0:
+        primary = measurements[0]
+        value = float(primary.get("value", 0))
+        unit = primary.get("unit", "")
+        meta["metric"] = primary.get("metric", "")
+        # Store all measurements in metadata
+        meta["measurements"] = measurements
+    else:
+        # Fallback to direct fields
+        value = float(p.get("value", 0))
+        unit = p.get("unit", "")
+
+    for key in ("category", "concentration_category", "level"):
         if key in p:
             meta[key] = p[key]
+
     return {
-        "timestamp": p.get("timestamp", _now_iso()),
-        "value": float(p.get("value", 0)),
-        "unit": p.get("unit", ""),
+        "timestamp": p.get("captured_at", p.get("timestamp", _now_iso())),
+        "value": value,
+        "unit": unit,
         "metadata": meta,
     }
 
 
 def _level(p: dict) -> dict:
-    meta = {}
-    if "percentage" in p:
-        meta["percentage"] = float(p["percentage"])
-    if "max_capacity" in p:
-        meta["max_capacity"] = p["max_capacity"]
+    # rest.level.v1: { sensor_id, captured_at, level_pct, level_liters, status }
+    level_pct = p.get("level_pct", p.get("percentage", p.get("value", 0)))
+    meta = {"status": p.get("status", "ok")}
+    if "level_liters" in p:
+        meta["level_liters"] = p["level_liters"]
+    if "level_pct" in p:
+        meta["level_pct"] = p["level_pct"]
+
     return {
-        "timestamp": p.get("timestamp", _now_iso()),
-        "value": float(p.get("value", 0)),
-        "unit": p.get("unit", ""),
+        "timestamp": p.get("captured_at", p.get("timestamp", _now_iso())),
+        "value": float(level_pct),
+        "unit": p.get("unit", "%"),
         "metadata": meta,
     }
 
 
 def _particulate(p: dict) -> dict:
-    meta = {}
-    for key in ("aqi", "air_quality_index", "category", "health_concern"):
+    # rest.particulate.v1: { sensor_id, captured_at, pm1_ug_m3, pm25_ug_m3, pm10_ug_m3, status }
+    # Use pm25 as the primary value
+    value = p.get("pm25_ug_m3", p.get("value", 0))
+    meta = {"status": p.get("status", "ok")}
+    for key in ("pm1_ug_m3", "pm25_ug_m3", "pm10_ug_m3", "aqi", "air_quality_index",
+                "category", "health_concern"):
         if key in p:
             meta[key] = p[key]
+
     return {
-        "timestamp": p.get("timestamp", _now_iso()),
-        "value": float(p.get("value", 0)),
-        "unit": p.get("unit", "ug/m3"),
+        "timestamp": p.get("captured_at", p.get("timestamp", _now_iso())),
+        "value": float(value),
+        "unit": p.get("unit", "µg/m³"),
         "metadata": meta,
     }
 
 
 def _power(p: dict) -> dict:
-    # may have watts, voltage, current or a nested reading
-    value = p.get("power_w") or p.get("watts") or p.get("value") or 0.0
-    unit = p.get("unit", "W")
-    meta = {}
-    for key in ("voltage_v", "current_a", "status", "state"):
+    # topic.power.v1: { topic, event_time, subsystem, power_kw, voltage_v, current_a, cumulative_kwh }
+    value = p.get("power_kw", p.get("power_w", p.get("watts", p.get("value", 0.0))))
+    unit = "kW" if "power_kw" in p else p.get("unit", "W")
+    meta = {"status": p.get("status", "ok")}
+    for key in ("voltage_v", "current_a", "cumulative_kwh", "subsystem", "state"):
         if key in p:
             meta[key] = p[key]
+
     return {
-        "timestamp": p.get("timestamp", _now_iso()),
+        "timestamp": p.get("event_time", p.get("timestamp", _now_iso())),
         "value": float(value),
         "unit": unit,
         "metadata": meta,
@@ -133,48 +162,78 @@ def _power(p: dict) -> dict:
 
 
 def _environment(p: dict) -> dict:
-    # life_support / radiation topics
-    value = p.get("value") or p.get("radiation_uSv_h") or p.get("level") or 0.0
-    unit = p.get("unit", "")
-    meta = {}
+    # topic.environment.v1: { topic, event_time, source: {system, segment}, measurements: [{metric, value, unit}], status }
+    measurements = p.get("measurements", [])
+    value = 0.0
+    unit = ""
+    meta = {"status": p.get("status", "ok")}
+
+    if measurements and len(measurements) > 0:
+        primary = measurements[0]
+        value = float(primary.get("value", 0))
+        unit = primary.get("unit", "")
+        meta["metric"] = primary.get("metric", "")
+        meta["measurements"] = measurements
+    else:
+        # Fallback to direct fields
+        value = float(
+            p.get("value", 0) or p.get("radiation_uSv_h", 0) or p.get("level", 0)
+        )
+        unit = p.get("unit", "")
+
+    source = p.get("source", {})
+    if source:
+        meta["source_system"] = source.get("system", "")
+        meta["source_segment"] = source.get("segment", "")
+
     for key in ("o2_percent", "co2_ppm", "pressure_kpa", "humidity_percent",
-                "temperature_c", "status", "alert_level"):
+                "temperature_c", "alert_level"):
         if key in p:
             meta[key] = p[key]
+
     return {
-        "timestamp": p.get("timestamp", _now_iso()),
-        "value": float(value),
+        "timestamp": p.get("event_time", p.get("timestamp", _now_iso())),
+        "value": value,
         "unit": unit,
         "metadata": meta,
     }
 
 
 def _thermal_loop(p: dict) -> dict:
-    value = p.get("temperature_c") or p.get("value") or 0.0
-    meta = {}
-    for key in ("flow_rate_lpm", "inlet_temp_c", "outlet_temp_c", "status"):
+    # topic.thermal_loop.v1: { topic, event_time, loop, temperature_c, flow_l_min, status }
+    value = p.get("temperature_c", p.get("value", 0.0))
+    meta = {"status": p.get("status", "ok")}
+    for key in ("flow_l_min", "flow_rate_lpm", "inlet_temp_c", "outlet_temp_c", "loop"):
         if key in p:
             meta[key] = p[key]
+    # Also ensure flow_l_min is in metadata under a standard key
+    if "flow_l_min" in p:
+        meta["flow_rate_lpm"] = p["flow_l_min"]
+
     return {
-        "timestamp": p.get("timestamp", _now_iso()),
+        "timestamp": p.get("event_time", p.get("timestamp", _now_iso())),
         "value": float(value),
-        "unit": p.get("unit", "celsius"),
+        "unit": p.get("unit", "°C"),
         "metadata": meta,
     }
 
 
 def _airlock(p: dict) -> dict:
-    # airlock has a state enum rather than a numeric reading
-    state = p.get("state") or p.get("status") or "UNKNOWN"
-    # encode state as numeric for rule evaluation (OPEN=1, CLOSED=0, CYCLING=2)
-    state_map = {"OPEN": 1.0, "CLOSED": 0.0, "CYCLING": 2.0}
+    # topic.airlock.v1: { topic, event_time, airlock_id, cycles_per_hour, last_state }
+    # last_state is the enum: IDLE, PRESSURIZING, DEPRESSURIZING
+    state = p.get("last_state", p.get("state", p.get("status", "UNKNOWN")))
+    # encode state as numeric for rule evaluation
+    state_map = {"IDLE": 0.0, "PRESSURIZING": 1.0, "DEPRESSURIZING": 2.0,
+                 "OPEN": 1.0, "CLOSED": 0.0, "CYCLING": 2.0}
     value = state_map.get(str(state).upper(), 0.0)
-    meta = {"state": state}
-    for key in ("inner_door", "outer_door", "pressure_kpa", "cycle_progress"):
+    meta = {"state": state, "status": p.get("status", "ok")}
+    for key in ("airlock_id", "cycles_per_hour", "inner_door", "outer_door",
+                "pressure_kpa", "cycle_progress"):
         if key in p:
             meta[key] = p[key]
+
     return {
-        "timestamp": p.get("timestamp", _now_iso()),
+        "timestamp": p.get("event_time", p.get("timestamp", _now_iso())),
         "value": value,
         "unit": "state",
         "metadata": meta,

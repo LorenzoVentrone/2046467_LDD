@@ -1,12 +1,19 @@
 import React, { useEffect, useState } from 'react'
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:8001'
+const API = import.meta.env.VITE_API_URL || ''
 
 const LABELS = {
-  cooling_fan:          'Cooling Fan',
-  entrance_humidifier:  'Entrance Humidifier',
-  hall_ventilation:     'Hall Ventilation',
-  habitat_heater:       'Habitat Heater',
+  cooling_fan: 'Cooling Fan',
+  entrance_humidifier: 'Entrance Humidifier',
+  hall_ventilation: 'Hall Ventilation',
+  habitat_heater: 'Habitat Heater',
+}
+
+const ICONS = {
+  cooling_fan: '❄️',
+  entrance_humidifier: '💧',
+  hall_ventilation: '🌬️',
+  habitat_heater: '🔥',
 }
 
 export default function ActuatorToggle({ actuatorId }) {
@@ -17,7 +24,6 @@ export default function ActuatorToggle({ actuatorId }) {
     fetch(`${API}/api/actuators`)
       .then(r => r.json())
       .then(data => {
-        // simulator returns {"actuators": {"cooling_fan": "OFF", ...}}
         const map = data.actuators ?? data
         if (Array.isArray(map)) {
           const found = map.find(a => a.id === actuatorId || a.name === actuatorId)
@@ -27,7 +33,7 @@ export default function ActuatorToggle({ actuatorId }) {
           setState(typeof found === 'string' ? found : (found.state ?? found.status ?? 'OFF'))
         }
       })
-      .catch(() => {})
+      .catch(() => { })
   }
 
   useEffect(() => {
@@ -46,42 +52,29 @@ export default function ActuatorToggle({ actuatorId }) {
         body: JSON.stringify({ state: next }),
       })
       if (resp.ok) setState(next)
-    } catch (_) {}
+    } catch (_) { }
     setLoading(false)
   }
 
   const isOn = state === 'ON'
 
   return (
-    <div style={styles.card}>
-      <div style={styles.label}>{LABELS[actuatorId] || actuatorId}</div>
-      <button
-        onClick={toggle}
-        disabled={loading || state === null}
-        style={{ ...styles.btn, background: isOn ? '#16a34a' : '#374151' }}
-      >
-        {state ?? '…'}
-      </button>
+    <div className="actuator-card">
+      <div style={{ fontSize: 24 }}>{ICONS[actuatorId] || '⚙️'}</div>
+      <div className="actuator-label">{LABELS[actuatorId] || actuatorId}</div>
+      <div className="toggle-container">
+        <button
+          className={`toggle-track${isOn ? ' on' : ''}`}
+          onClick={toggle}
+          disabled={loading || state === null}
+          aria-label={`Toggle ${actuatorId}`}
+        >
+          <div className="toggle-thumb" />
+        </button>
+        <span className={`toggle-state-label ${isOn ? 'on' : 'off'}`}>
+          {state ?? '…'}
+        </span>
+      </div>
     </div>
   )
-}
-
-const styles = {
-  card: {
-    background: '#111827',
-    border: '1px solid #1e3a5f',
-    borderRadius: 8,
-    padding: '14px 18px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 10,
-    alignItems: 'center',
-    minWidth: 150,
-  },
-  label: { fontSize: 11, color: '#6b8fa8', textTransform: 'uppercase', letterSpacing: 1 },
-  btn: {
-    border: 'none', borderRadius: 6, padding: '8px 24px',
-    color: '#fff', fontWeight: 'bold', cursor: 'pointer',
-    fontSize: 14, width: '100%',
-  },
 }

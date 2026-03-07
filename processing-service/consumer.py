@@ -47,8 +47,26 @@ async def consume_loop():
             try:
                 event = msg.value
                 await state_cache.update(event)
-                await rules_engine.evaluate(event)
+
+                # Evaluate automation rules — returns alert payloads for any that fired
+                try:
+                    alerts = await rules_engine.evaluate(event)
+                except Exception as exc:
+                    logger.error("Rule evaluation failed for event %s: %s", event.get("sensor_id"), exc)
+                    alerts = []
+
+                # Broadcast the sensor event to all connected dashboards
                 await manager.broadcast(event)
+
+                # Broadcast each alert so the frontend shows real-time notifications
+                for alert in alerts:
+                    await manager.broadcast(alert)
+                    logger.info(
+                        "Alert broadcast: IF %s %s %s THEN %s → %s (value=%.2f)",
+                        alert["sensor_id"], alert["operator"], alert["threshold"],
+                        alert["actuator_id"], alert["action"], alert["sensor_value"],
+                    )
+
             except (KeyError, TypeError) as exc:
                 logger.warning("Malformed event, skipping: %s — %s", msg.value, exc)
     except asyncio.CancelledError:

@@ -135,6 +135,12 @@ async def delete_rule(rule_id: str):
         raise HTTPException(status_code=404, detail="Rule not found")
 
 
+@app.get("/api/rules/log")
+async def get_rule_logs(limit: int = 50):
+    """Return recent rule-fired events for the Alerts panel."""
+    return await database.get_recent_logs(limit)
+
+
 # ── WebSocket ──────────────────────────────────────────────────────────────────
 
 @app.websocket("/ws")
