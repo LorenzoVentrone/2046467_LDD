@@ -1,0 +1,89 @@
+services:
+  simulator:
+    image: mars-iot-simulator:multiarch_v1
+    ports:
+      - "8081:8080"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redpanda:
+    image: redpandadata/redpanda:latest
+    command:
+      - redpanda
+      - start
+      - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr internal://redpanda:9092,external://localhost:19092
+      - --pandaproxy-addr internal://0.0.0.0:8082,external://0.0.0.0:18082
+      - --advertise-pandaproxy-addr internal://redpanda:8082,external://localhost:18082
+      - --schema-registry-addr internal://0.0.0.0:8081,external://0.0.0.0:18081
+      - --rpc-addr redpanda:33145
+      - --advertise-rpc-addr redpanda:33145
+      - --mode dev-container
+      - --smp 1
+      - --default-log-level=warn
+    ports:
+      - "19092:19092"
+      - "18081:18081"
+      - "18082:18082"
+      - "9644:9644"
+    healthcheck:
+      test: ["CMD", "rpk", "cluster", "health"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redpanda-init:
+    image: redpandadata/redpanda:latest
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        rpk topic create normalized.sensor.events --brokers redpanda:9092 || true
+    restart: "no"
+
+  ingestion-service:
+    build: ./ingestion-service
+    environment:
+      - SIMULATOR_URL=http://simulator:8080
+      - KAFKA_BROKER=redpanda:9092
+      - POLL_INTERVAL=5
+    depends_on:
+      simulator:
+        condition: service_healthy
+      redpanda-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  processing-service:
+    build: ./processing-service
+    ports:
+      - "8001:8001"
+    environment:
+      - KAFKA_BROKER=redpanda:9092
+      - SIMULATOR_URL=http://simulator:8080
+      - DB_PATH=/data/rules.db
+    volumes:
+      - processing-data:/data
+    depends_on:
+      redpanda-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    environment:
+      - VITE_API_URL=http://localhost:8001
+      - VITE_WS_URL=ws://localhost:8001
+    depends_on:
+      - processing-service
+    restart: unless-stopped
+
+volumes:
+  processing-data:
