@@ -29,13 +29,12 @@ const TABS = {
 }
 
 export default function App() {
-  const { sensorState, sensorHistory, alerts, eventLog } = useWebSocket()
+  const { sensorState, sensorHistory, alerts, eventLog, connected } = useWebSocket()
   const [activeTab, setActiveTab] = useState('overview')
 
-  // KPI values for stat cards
-  const temp = sensorState.greenhouse_temperature
+  const temp     = sensorState.greenhouse_temperature
   const humidity = sensorState.entrance_humidity
-  const co2 = sensorState.co2_hall
+  const co2      = sensorState.co2_hall
   const pressure = sensorState.corridor_pressure
 
   return (
@@ -54,6 +53,11 @@ export default function App() {
             <div className="header-sub">
               Last updated: {new Date().toLocaleTimeString()} · {Object.keys(sensorState).length} sensors active
             </div>
+          </div>
+          {/* Live connection indicator */}
+          <div className={`conn-badge${connected ? ' conn-badge--live' : ' conn-badge--reconnecting'}`}>
+            <span className="conn-dot" />
+            {connected ? 'LIVE' : 'RECONNECTING'}
           </div>
         </div>
 
@@ -76,7 +80,6 @@ export default function App() {
           {/* ── OVERVIEW ─────────────────────────────────── */}
           {activeTab === 'overview' && (
             <>
-              {/* KPI Stat Cards */}
               <div className="stat-grid">
                 <StatCard
                   label="Greenhouse Temp"
@@ -112,7 +115,6 @@ export default function App() {
                 />
               </div>
 
-              {/* Charts */}
               <div className="chart-grid">
                 <SensorChart
                   title="Thermal Loop Temperature"
@@ -127,7 +129,6 @@ export default function App() {
                 />
               </div>
 
-              {/* Event log */}
               <EventLog events={eventLog} />
             </>
           )}
@@ -149,32 +150,12 @@ export default function App() {
                 ))}
               </div>
 
-              {/* Telemetry Charts */}
               <h2 className="section-title" style={{ marginTop: 24 }}>Live Charts</h2>
               <div className="chart-grid">
-                <SensorChart
-                  title="Thermal Loop"
-                  history={sensorHistory.thermal_loop || []}
-                  unit="°C"
-                />
-                <SensorChart
-                  title="Power Bus"
-                  history={sensorHistory.power_bus || []}
-                  color="#60a5fa"
-                  unit="W"
-                />
-                <SensorChart
-                  title="Power Consumption"
-                  history={sensorHistory.power_consumption || []}
-                  color="#f59e0b"
-                  unit="W"
-                />
-                <SensorChart
-                  title="Greenhouse Temperature"
-                  history={sensorHistory.greenhouse_temperature || []}
-                  color="#22c55e"
-                  unit="°C"
-                />
+                <SensorChart title="Thermal Loop"         history={sensorHistory.thermal_loop || []}          unit="°C" />
+                <SensorChart title="Power Bus"            history={sensorHistory.power_bus || []}             color="#60a5fa" unit="W" />
+                <SensorChart title="Power Consumption"    history={sensorHistory.power_consumption || []}     color="#f59e0b" unit="W" />
+                <SensorChart title="Greenhouse Temperature" history={sensorHistory.greenhouse_temperature || []} color="#22c55e" unit="°C" />
               </div>
             </>
           )}

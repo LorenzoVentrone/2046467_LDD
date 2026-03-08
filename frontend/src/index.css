@@ -817,3 +817,91 @@ body {
   .stat-grid { grid-template-columns: 1fr 1fr; }
   .chart-grid { grid-template-columns: 1fr; }
 }
+
+/* ── Permanent Rules (RuleManager) ──────────────────────────────────── */
+.rule-section {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-bottom: 12px;
+}
+
+.rule-section--permanent {
+  border-color: rgba(251, 191, 36, 0.3);
+}
+
+.rule-section-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.rule-lock-badge {
+  font-size: 10px;
+  color: #fbbf24;
+  font-weight: bold;
+  letter-spacing: 1.5px;
+}
+
+.rule-section-hint {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.rule-item--permanent {
+  border-left: 2px solid #fbbf24 !important;
+  background: rgba(251, 191, 36, 0.04) !important;
+}
+
+.rule-locked-tag {
+  flex-shrink: 0;
+  font-size: 9px;
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 1px;
+}
+
+.rule-unit {
+  color: var(--text-secondary);
+}
+
+.action-on  { color: #16a34a; font-weight: bold; }
+.action-off { color: #f87171; font-weight: bold; }
+
+/* ── Connection badge (App header) ──────────────────────────────────── */
+.conn-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  margin-left: auto;
+}
+
+.conn-badge--live          { color: #16a34a; }
+.conn-badge--reconnecting  { color: #f87171; }
+
+.conn-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.conn-badge--live .conn-dot {
+  box-shadow: 0 0 6px #16a34a;
+}
+
+/* ── Actuator last-changed timestamp ────────────────────────────────── */
+.actuator-changed {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 4px;
+}

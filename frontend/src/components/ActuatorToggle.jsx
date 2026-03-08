@@ -3,22 +3,23 @@ import React, { useEffect, useState } from 'react'
 const API = import.meta.env.VITE_API_URL || ''
 
 const LABELS = {
-  cooling_fan: 'Cooling Fan',
-  entrance_humidifier: 'Entrance Humidifier',
-  hall_ventilation: 'Hall Ventilation',
-  habitat_heater: 'Habitat Heater',
+  cooling_fan:          'Cooling Fan',
+  entrance_humidifier:  'Entrance Humidifier',
+  hall_ventilation:     'Hall Ventilation',
+  habitat_heater:       'Habitat Heater',
 }
 
 const ICONS = {
-  cooling_fan: '❄️',
-  entrance_humidifier: '💧',
-  hall_ventilation: '🌬️',
-  habitat_heater: '🔥',
+  cooling_fan:          '❄️',
+  entrance_humidifier:  '💧',
+  hall_ventilation:     '🌬️',
+  habitat_heater:       '🔥',
 }
 
 export default function ActuatorToggle({ actuatorId }) {
   const [state, setState] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [lastChanged, setLastChanged] = useState(null)
 
   const fetchState = () => {
     fetch(`${API}/api/actuators`)
@@ -51,7 +52,10 @@ export default function ActuatorToggle({ actuatorId }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ state: next }),
       })
-      if (resp.ok) setState(next)
+      if (resp.ok) {
+        setState(next)
+        setLastChanged(new Date())
+      }
     } catch (_) { }
     setLoading(false)
   }
@@ -75,6 +79,9 @@ export default function ActuatorToggle({ actuatorId }) {
           {state ?? '…'}
         </span>
       </div>
+      {lastChanged && (
+        <div className="actuator-changed">Changed {lastChanged.toLocaleTimeString()}</div>
+      )}
     </div>
   )
 }
