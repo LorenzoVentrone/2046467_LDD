@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useWebSocket } from './hooks/useWebSocket'
 import Sidebar from './components/Sidebar'
 import StatCard from './components/StatCard'
@@ -61,6 +61,12 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('overview')
   const [theme, setTheme] = useState(() => localStorage.getItem('mars-theme') || 'light')
   const [dnd, setDnd] = useState(() => localStorage.getItem('mars-dnd') === 'true')
+  const [seenAlertCount, setSeenAlertCount] = useState(0)
+
+  // Clear the badge whenever the user is on the Alerts tab
+  useEffect(() => {
+    if (activeTab === 'alerts') setSeenAlertCount(alerts.length)
+  }, [activeTab, alerts.length])
 
   const toggleTheme = () => {
     const next = theme === 'light' ? 'dark' : 'light'
@@ -84,7 +90,7 @@ export default function App() {
       <Sidebar
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        alertCount={alerts.length}
+        alertCount={Math.max(0, alerts.length - seenAlertCount)}
       />
 
       <div className="main-area">
