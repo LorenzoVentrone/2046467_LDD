@@ -3,8 +3,6 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 const HISTORY_SIZE = 30
 
 function getWsUrl() {
-  // In production (Docker), use the same host the page was loaded from (nginx proxies /ws)
-  // In dev, use VITE_WS_URL or fallback to current host
   if (import.meta.env.VITE_WS_URL) {
     return import.meta.env.VITE_WS_URL
   }
@@ -17,45 +15,47 @@ export function useWebSocket() {
   const [sensorHistory, setSensorHistory] = useState({})
   const [alerts, setAlerts] = useState([])
   const [eventLog, setEventLog] = useState([])
+  const [connected, setConnected] = useState(false)
   const ws = useRef(null)
 
   const connect = useCallback(() => {
     const base = getWsUrl()
     ws.current = new WebSocket(`${base}/ws`)
 
+    ws.current.onopen = () => {
+      setConnected(true)
+    }
+
     ws.current.onmessage = (e) => {
       try {
         const data = JSON.parse(e.data)
 
-        // Handle alert messages from the rules engine
         if (data.type === 'alert') {
           setAlerts(prev => [...prev, data])
           return
         }
 
-        // Handle sensor events
         if (data.sensor_id) {
           setSensorState(prev => ({ ...prev, [data.sensor_id]: data }))
 
-          // Append to history (rolling buffer)
           setSensorHistory(prev => {
             const existing = prev[data.sensor_id] || []
             const updated = [...existing, data].slice(-HISTORY_SIZE)
             return { ...prev, [data.sensor_id]: updated }
           })
 
-          // Append to event log (keep last 50)
           setEventLog(prev => [data, ...prev].slice(0, 50))
         }
       } catch (_) { }
     }
 
     ws.current.onclose = () => {
+      setConnected(false)
       setTimeout(connect, 3000)
     }
 
     ws.current.onerror = () => {
-      // Silently handle - onclose will trigger reconnect
+      // Silently handle — onclose will trigger reconnect
     }
   }, [])
 
@@ -64,5 +64,5 @@ export function useWebSocket() {
     return () => ws.current?.close()
   }, [connect])
 
-  return { sensorState, sensorHistory, alerts, eventLog }
+  return { sensorState, sensorHistory, alerts, eventLog, connected }
 }

@@ -30,6 +30,7 @@ SIMULATOR_URL = os.getenv("SIMULATOR_URL", "http://localhost:8080")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await database.init_db()
+    await database.seed_permanent_rules()
     task = asyncio.create_task(consume_loop())
     task.add_done_callback(
         lambda t: logger.error("Consumer task died: %s", t.exception())
@@ -123,13 +124,19 @@ async def create_rule(body: RuleCreate):
     rule = {
         "id": str(uuid.uuid4()),
         **body.model_dump(),
+        "permanent": 0,
     }
     await database.insert_rule(rule)
-    return rule
+    return {**rule, "permanent": False}
 
 
 @app.delete("/api/rules/{rule_id}", status_code=204)
 async def delete_rule(rule_id: str):
+    rule = await database.get_rule(rule_id)
+    if rule is None:
+        raise HTTPException(status_code=404, detail="Rule not found")
+    if rule.get("permanent"):
+        raise HTTPException(status_code=403, detail="Cannot delete a permanent safety rule")
     deleted = await database.delete_rule(rule_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Rule not found")
