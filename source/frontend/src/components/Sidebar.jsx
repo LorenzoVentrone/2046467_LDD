@@ -35,25 +35,19 @@ const Icon = {
   ),
 }
 
-const BrandMark = () => (
-  <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-    <circle cx="9" cy="9" r="9" fill="white" fillOpacity="0.2" />
-    <circle cx="9" cy="9" r="5" fill="white" fillOpacity="0.9" />
-    <circle cx="9" cy="9" r="2.5" fill="white" />
-  </svg>
-)
+import iconImg from '../images/icon_nobg.png'
 
 const NAV = [
   {
     section: 'Monitoring', items: [
-      { id: 'overview',  icon: 'overview',  label: 'Overview' },
-      { id: 'sensors',   icon: 'sensors',   label: 'Sensors' },
+      { id: 'overview', icon: 'overview', label: 'Overview' },
+      { id: 'sensors', icon: 'sensors', label: 'Sensors' },
       { id: 'actuators', icon: 'actuators', label: 'Actuators' },
     ]
   },
   {
     section: 'Automation', items: [
-      { id: 'rules',  icon: 'rules',  label: 'Rules' },
+      { id: 'rules', icon: 'rules', label: 'Rules' },
       { id: 'alerts', icon: 'alerts', label: 'Alerts' },
     ]
   },
@@ -63,8 +57,8 @@ export default function Sidebar({ activeTab, onTabChange, alertCount = 0 }) {
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
-        <div className="brand-icon">
-          <BrandMark />
+        <div className="brand-icon" style={{ background: 'transparent', padding: 0 }}>
+          <img src={iconImg} alt="App Icon" style={{ width: '150%', height: '150%', objectFit: 'contain', borderRadius: '8px' }} />
         </div>
         <div>
           <div className="brand-text">MARS HABITAT</div>
