@@ -40,21 +40,21 @@ Rule Engine UI
 
 **US-13 — Rule Deletion/Toggle (UI)** As a system administrator, I want to be able to delete or disable an active rule from the dashboard so I can stop faulty automation logic during a hardware sensor failure.Rule Engine UI
 
-**US-14** — Automated Heat Mitigation As a botanist, I want the system to automatically evaluate IF `greenhouse_temperature > 28 °C THEN set cooling_fan to ON` so my crops survive heat spikes while I am asleep.
+**US-14** — Automated Heat Mitigation As a botanist, I want the system to automatically evaluate IF `greenhouse_temperature > 24 °C THEN set cooling_fan to ON` so my crops survive heat spikes while I am asleep.
 Rule Engine Backend
 
-**US-15** — Automated Heat Stabilization As a botanist, I want the system to automatically evaluate `IF greenhouse_temperature < 24 °C THEN set cooling_fan to OFF` so the fan doesn’t waste power once the temperature normalizes.Rule Engine Backend
+**US-15** — Automated Heat Stabilization As a botanist, I want the system to automatically evaluate `IF greenhouse_temperature < 22 °C THEN set cooling_fan to OFF` so the fan doesn’t waste power once the temperature normalizes.Rule Engine Backend
 
-**US-16** — Emergency CO2 Venting As a safety officer, I want the system to automatically evaluate `IF co2_hall > 1000 THEN set hall_ventilation to ON` to automatically protect the crew from asphyxiation.
+**US-16** — Emergency CO2 Venting As a safety officer, I want the system to automatically evaluate `IF co2_hall > 900ppm THEN set hall_ventilation to ON` to automatically protect the crew from asphyxiation.
 Rule Engine Backend
 
-**US-17** — CO2 Venting Deactivation As a safety officer, I want the system to automatically evaluate `IF co2_hall < 600 THEN set hall_ventilation to OFF` so we don’t unnecessarily vent our internal atmosphere into space once levels are safe.
+**US-17** — CO2 Venting Deactivation As a safety officer, I want the system to automatically evaluate `IF co2_hall < 600ppm THEN set hall_ventilation to OFF` so we don’t unnecessarily vent our internal atmosphere into space once levels are safe.
 Rule Engine Backend
 
-**US-18** — Automated Cold Survival As a crew member, I want the system to automatically evaluate `IF thermal_loop < 10 THEN set habitat_heater to ON` so the habitat is warmed automatically during a frigid Martian night.
+**US-18** — Automated Cold Survival As a crew member, I want the system to automatically evaluate `IF thermal_loop < 10°C THEN set habitat_heater to ON` so the habitat is warmed automatically during a frigid Martian night.
 Rule Engine Backend
 
-**US-19** — Automated Dryness Mitigation As a habitat operator, I want the system to evaluate `IF entrance_humidity < 30 THEN set entrance_humidifier to ON` to prevent the extreme dry air from cracking the entrance airlock seals.
+**US-19** — Automated Dryness Mitigation As a habitat operator, I want the system to evaluate `IF entrance_humidity < 40% THEN set entrance_humidifier to ON` to prevent the extreme dry air from cracking the entrance airlock seals.
 Rule Engine Backend
 
 **US-20** — Persistence During Outages As a mission engineer, I want the automation engine to load all my saved rules from the database immediately after a container restart so the habitat doesn’t lose its safety protocols during a system crash.

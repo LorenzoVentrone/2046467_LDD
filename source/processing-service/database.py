@@ -33,12 +33,12 @@ CREATE TABLE IF NOT EXISTS rule_logs (
 
 # Safety rules seeded on startup — correspond to user stories US14–US19 plus two extras.
 PERMANENT_RULES = [
-    {"id": "perm-greenhouse-heat-on",    "sensor_id": "greenhouse_temperature", "operator": ">",  "threshold": 28.0,  "unit": "°C",    "actuator_id": "cooling_fan",         "action": "ON",  "permanent": 1},
-    {"id": "perm-greenhouse-heat-off",   "sensor_id": "greenhouse_temperature", "operator": "<",  "threshold": 24.0,  "unit": "°C",    "actuator_id": "cooling_fan",         "action": "OFF", "permanent": 1},
-    {"id": "perm-co2-vent-on",           "sensor_id": "co2_hall",               "operator": ">",  "threshold": 1000.0,"unit": "ppm",   "actuator_id": "hall_ventilation",    "action": "ON",  "permanent": 1},
+    {"id": "perm-greenhouse-heat-on",    "sensor_id": "greenhouse_temperature", "operator": ">",  "threshold": 24.0,  "unit": "°C",    "actuator_id": "cooling_fan",         "action": "ON",  "permanent": 1},
+    {"id": "perm-greenhouse-heat-off",   "sensor_id": "greenhouse_temperature", "operator": "<",  "threshold": 22.0,  "unit": "°C",    "actuator_id": "cooling_fan",         "action": "OFF", "permanent": 1},
+    {"id": "perm-co2-vent-on",           "sensor_id": "co2_hall",               "operator": ">",  "threshold": 900.0,"unit": "ppm",   "actuator_id": "hall_ventilation",    "action": "ON",  "permanent": 1},
     {"id": "perm-co2-vent-off",          "sensor_id": "co2_hall",               "operator": "<",  "threshold": 600.0, "unit": "ppm",   "actuator_id": "hall_ventilation",    "action": "OFF", "permanent": 1},
-    {"id": "perm-thermal-heat-on",       "sensor_id": "thermal_loop",           "operator": "<",  "threshold": 10.0,  "unit": "°C",    "actuator_id": "habitat_heater",      "action": "ON",  "permanent": 1},
-    {"id": "perm-humidity-humidifier-on","sensor_id": "entrance_humidity",      "operator": "<",  "threshold": 30.0,  "unit": "%",     "actuator_id": "entrance_humidifier", "action": "ON",  "permanent": 1},
+    {"id": "perm-thermal-heat-on",       "sensor_id": "thermal_loop",           "operator": "<",  "threshold": 25.0,  "unit": "°C",    "actuator_id": "habitat_heater",      "action": "ON",  "permanent": 1},
+    {"id": "perm-humidity-humidifier-on","sensor_id": "entrance_humidity",      "operator": "<",  "threshold": 40.0,  "unit": "%",     "actuator_id": "entrance_humidifier", "action": "ON",  "permanent": 1},
     {"id": "perm-humidity-humidifier-off","sensor_id": "entrance_humidity",     "operator": ">",  "threshold": 80.0,  "unit": "%",     "actuator_id": "entrance_humidifier", "action": "OFF", "permanent": 1},
     {"id": "perm-pm25-vent-on",          "sensor_id": "air_quality_pm25",       "operator": ">",  "threshold": 35.0,  "unit": "μg/m³", "actuator_id": "hall_ventilation",    "action": "ON",  "permanent": 1},
 ]
