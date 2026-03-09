@@ -36,7 +36,7 @@ const Icon = {
 }
 
 const BrandMark = () => (
-  <img src="/mars_icon.svg" alt="Mars Habitat" width="32" height="32" style={{ display: 'block' }} />
+  <img src="/mars_icon_new.png" alt="Mars Habitat" width="32" height="32" style={{ display: 'block', borderRadius: 8 }} />
 )
 
 const NAV = [
