@@ -1,85 +1,190 @@
 # Why I Built the Ingestion Layer This Way
 
 *A student's chain of thought — written after the fact, but honest about how it actually happened.*
+*Each decision is annotated with the exact source (PDF section or SCHEMA_CONTRACT.md) that forced or justified it.*
 
 ---
 
 ## The starting point: two very different kinds of devices
 
-The first thing that hit me when I read the spec was that the simulator exposes sensors in two fundamentally different ways. Some devices answer when you ask them (REST). Others just talk when they have something to say (SSE streams). I couldn't treat them the same way.
+> **Source — PDF §3.2 and §3.3, and PDF §4 point 1:**
+> *"Collects data from simulated devices (polling and/or stream depending on team size)"*
+> §3.2 lists 8 REST sensors under `GET /api/sensors/{sensor_id}`.
+> §3.3 lists 7 telemetry topics under `GET /api/telemetry/stream/{topic}` (SSE) or `WS /api/telemetry/ws?topic={topic}`.
 
-For REST sensors, I needed to go and fetch the data on a schedule. For telemetry, I needed to sit and listen. So the first architectural decision was: **two separate components**, a `Poller` and a `StreamConsumer`, running concurrently. I didn't want them to know about each other — both just produce events and hand them off to whoever is listening downstream.
+The spec explicitly splits devices into two categories with different access patterns. REST devices must be *asked* — you go and fetch. Telemetry devices *publish* — you subscribe and listen. That difference in protocol is what forced the split into a `Poller` and a `StreamConsumer`. A single unified fetcher couldn't handle both without becoming a mess.
 
-That "whoever" is Kafka. The decoupling felt natural: once I publish a normalized event, I'm done. The processing service can do whatever it wants with it and I don't need to care.
+> **Source — PDF §6 Architectural constraints (Mandatory):**
+> *"Separate ingestion, processing, and presentation"*
+> *"Strongly discouraged: Tight coupling between services"*
+
+Both components publish to Kafka and nothing else. They don't talk to the processing service directly. That's the decoupling the spec demands.
 
 ---
 
 ## The unified schema: why force everything into one shape
 
-The hardest part wasn't the code — it was deciding what an event *is* in this system.
+> **Source — PDF §4 point 2:**
+> *"Normalizes heterogeneous payloads into a standard internal event format. You need to define and document such a standard."*
+>
+> **Source — PDF §5.1:**
+> *"Convert incoming data into a unified internal event schema"*
+>
+> **Source — PDF §7.3 Baseline, point 3:**
+> *"Unified event schema"*
 
-Every raw payload looks different. `rest.scalar.v1` gives you a flat `value` and `unit`. `rest.chemistry.v1` gives you an array of measurements. `rest.particulate.v1` gives you three separate PM readings with no primary. `topic.airlock.v1` gives you a state enum and a counter. None of them agree on field names, timestamp keys, or what "the value" even means.
+The assignment doesn't just suggest normalization — it explicitly requires it as a baseline deliverable. The downstream consumers (rules engine, frontend) must not need to know anything about the raw sensor protocol. That's the contract.
 
-I needed downstream consumers — the rules engine, the frontend — to not have to deal with any of that. So I designed the `InternalEvent` to answer one question per event: **what sensor, what value, what unit, when?**
+> **Source — SCHEMA_CONTRACT.md, all sections:**
+> The contract shows that raw payloads disagree on almost everything:
+> - Timestamp key: REST sensors use `captured_at`; telemetry topics use `event_time`
+> - Value structure: some schemas have a flat `value` field; others use a `measurements` array; others use named fields like `power_kw`, `level_pct`, `pm25_ug_m3`, `temperature_c`
+> - Unit: some schemas include a `unit` field; `rest.level.v1`, `rest.particulate.v1`, `topic.thermal_loop.v1`, and `topic.airlock.v1` do not
+
+This is exactly why the `InternalEvent` schema exists. Without it, every consumer would need a switch statement over 8 raw schemas.
 
 ```
 event_id, sensor_id, source_type, raw_schema, timestamp, value, unit, metadata
 ```
 
-`value` is always a `float`. `unit` is always a string. `timestamp` is always ISO8601. If you want the original fields, they're all in `metadata`. This way the rules engine can do `value > threshold` without knowing anything about how the sensor works.
+`value` is always a `float`. `unit` is always a string. `timestamp` is always ISO8601.
 
 ---
 
 ## The normalizer: deciding what "the value" is
 
-This is where most of the judgment calls happened.
+### Scalar sensors (`_scalar`)
 
-**Scalar sensors** (`greenhouse_temperature`, `entrance_humidity`, etc.) were easy — the schema literally gives you a single `value` and `unit`. No decision needed.
+> **Source — SCHEMA_CONTRACT.md, `rest.scalar.v1`:**
+> ```json
+> { "sensor_id", "captured_at", "metric", "value", "unit", "status" }
+> ```
 
-**Chemistry sensors** (`hydroponic_ph`, `air_quality_voc`) give you a `measurements` array. I chose `measurements[0]` as the primary value. For `hydroponic_ph` this is fine — there's really only one thing being measured (pH). For `air_quality_voc` there might be multiple compounds, but since the rules engine operates on a single number, I had to pick one. I preserve the full array in metadata so the frontend can display everything.
+The schema gives you a single `value` and `unit` directly. No decision needed — map them straight across. Use `captured_at` as the timestamp.
 
-**Level sensor** (`water_tank_level`) — the primary value is `level_pct` because percentage is universally comparable. `level_liters` depends on tank size and is less useful for rule thresholds. I put liters in metadata.
+---
 
-**Particulate** (`air_quality_pm25`) — the schema gives you PM1, PM2.5, and PM10. The sensor is named `air_quality_pm25`, so I made `pm25_ug_m3` the primary value. Easy call.
+### Chemistry sensors (`_chemistry`)
 
-**Power topics** (`solar_array`, `power_bus`, `power_consumption`) — I used `power_kw` as the primary value. Power in kilowatts is the most immediately actionable metric. Voltage and current are in metadata for diagnostics.
+> **Source — SCHEMA_CONTRACT.md, `rest.chemistry.v1`:**
+> ```json
+> { "sensor_id", "captured_at", "measurements": [{"metric", "value", "unit"}], "status" }
+> ```
 
-**Environment topics** (`radiation`, `life_support`) — same `measurements[]` pattern as chemistry. Same solution: first measurement is primary, all are in metadata. The `source` object (system + segment) goes into metadata so the frontend can label things properly.
+There is no top-level `value`. The data lives in a `measurements` array. I had to pick one element as the primary `value` for the `InternalEvent`. I chose `measurements[0]` and preserved the full array in `metadata` so the frontend can still display all compounds if needed.
 
-**Thermal loop** (`thermal_loop`) — straightforward: `temperature_c` is the value you want to write rules against. Flow rate (`flow_l_min`) is a diagnostic, goes in metadata. I also aliased it as `flow_rate_lpm` in metadata for display consistency.
+---
 
-**Airlock** (`airlock`) — this was the hardest one. The schema gives you `last_state` (an enum: IDLE, PRESSURIZING, DEPRESSURIZING) and `cycles_per_hour` (a number). The rules engine only understands numbers. I encoded the state as a numeric value: IDLE=0, PRESSURIZING=1, DEPRESSURIZING=2. The tradeoff is that rules like `IF airlock = 1` work but aren't immediately readable. In hindsight, `cycles_per_hour` might have been a more intuitive primary value for rules, but at the time I reasoned that knowing *what state the airlock is in* is more safety-critical than how many cycles it has done. The actual state string is preserved in metadata.
+### Level sensor (`_level`)
+
+> **Source — SCHEMA_CONTRACT.md, `rest.level.v1`:**
+> ```json
+> { "sensor_id", "captured_at", "level_pct", "level_liters", "status" }
+> ```
+> Note: no `unit` field in this schema.
+
+Two candidate values: `level_pct` and `level_liters`. I chose `level_pct` because percentage is scale-independent — a rule like `IF water_tank_level < 20` reads the same regardless of how large the tank is. `level_liters` requires knowing the tank capacity to write a meaningful threshold. Since the schema has no `unit` field, the default `"%"` is hardcoded.
+
+---
+
+### Particulate sensor (`_particulate`)
+
+> **Source — SCHEMA_CONTRACT.md, `rest.particulate.v1`:**
+> ```json
+> { "sensor_id", "captured_at", "pm1_ug_m3", "pm25_ug_m3", "pm10_ug_m3", "status" }
+> ```
+> Note: three separate PM readings, no single `value` field, no `unit` field.
+
+Three candidates. The sensor is named `air_quality_pm25` in the REST sensor table (PDF §3.2), which is an unambiguous signal — PM2.5 is the intended primary metric. All three values go into metadata.
+
+---
+
+### Power topics (`_power`)
+
+> **Source — SCHEMA_CONTRACT.md, `topic.power.v1`:**
+> ```json
+> { "topic", "event_time", "subsystem", "power_kw", "voltage_v", "current_a", "cumulative_kwh" }
+> ```
+> Note: `event_time` not `captured_at`. No `status` field.
+
+`power_kw` is the most directly actionable value for automation rules (e.g. shed load if consumption exceeds X kW). Voltage and current are diagnostic values — useful for display but not for simple threshold rules. `cumulative_kwh` is an aggregate counter, not a real-time state. Timestamp key is `event_time` — different from REST sensors, which is exactly why the normalizer maps it explicitly rather than using a generic key.
+
+---
+
+### Environment topics (`_environment`)
+
+> **Source — SCHEMA_CONTRACT.md, `topic.environment.v1`:**
+> ```json
+> {
+>   "topic", "event_time",
+>   "source": { "system", "segment" },
+>   "measurements": [{"metric", "value", "unit"}],
+>   "status"
+> }
+> ```
+
+Same `measurements[]` pattern as `rest.chemistry.v1` — same solution. First measurement is the primary `value`, all are in metadata. The `source` object (system + segment) is flattened into metadata as `source_system` / `source_segment` so the frontend can label sensor readings with their physical location without parsing a nested object.
+
+---
+
+### Thermal loop (`_thermal_loop`)
+
+> **Source — SCHEMA_CONTRACT.md, `topic.thermal_loop.v1`:**
+> ```json
+> { "topic", "event_time", "loop", "temperature_c", "flow_l_min", "status" }
+> ```
+> Note: no `unit` field.
+
+`temperature_c` is the value you write safety rules against (e.g. US-18: `IF thermal_loop < 10 THEN set habitat_heater to ON`). Flow rate is a health indicator for the cooling circuit but not a direct safety threshold in the user stories. `"°C"` is hardcoded as the unit since the schema provides no `unit` field.
+
+> **Source — Users_Stories.md, US-18:**
+> *"IF thermal_loop < 10 THEN set habitat_heater to ON"*
+
+This user story directly confirms that `temperature_c` must be the primary `value` — that's the field the rule threshold is written against.
+
+---
+
+### Airlock (`_airlock`)
+
+> **Source — SCHEMA_CONTRACT.md, `topic.airlock.v1`:**
+> ```json
+> { "topic", "event_time", "airlock_id", "cycles_per_hour", "last_state" }
+> ```
+> `last_state` enum: `"IDLE"`, `"PRESSURIZING"`, `"DEPRESSURIZING"`
+> Note: no `status` field, no `unit` field.
+
+This was the hardest decision. Two candidates: `last_state` (an enum string) and `cycles_per_hour` (a float).
+
+> **Source — PDF §5.2 Automation engine:**
+> *"IF \<sensor_name\> \<operator\> \<value\>"*
+> Supported operators: `<`, `<=`, `=`, `>=`, `>`
+
+The rules engine operates on numeric comparisons. `last_state` is a string enum — it cannot be compared with `<` or `>` out of the box. To make it usable in rules at all, I encoded it as a number: IDLE=0, PRESSURIZING=1, DEPRESSURIZING=2. The tradeoff is that rules become `IF airlock = 1` instead of `IF airlock = PRESSURIZING`, which is less readable. `cycles_per_hour` would have been more naturally numeric, but knowing the *state* of an airlock is more safety-relevant than its cycle rate. The actual state string is preserved in metadata for the frontend.
 
 ---
 
 ## The Poller: why gather, why 5 seconds
 
-I poll all 8 sensors concurrently using `asyncio.gather`. Polling them sequentially would mean each sensor's reading is staggered by network latency — the 8th sensor gets polled almost a second after the 1st. With `gather`, all 8 requests go out simultaneously and I get a near-synchronous snapshot.
+> **Source — PDF §3.2:** 8 REST sensors, all polled independently.
+> **Source — PDF §3.3:** *"Default publish interval: 5 seconds."*
 
-I wrapped each poll in individual try/except so that a single failing sensor (simulator down, timeout, 500 error) doesn't kill the whole polling loop. The error is logged as a warning and the next cycle continues normally.
-
-5 seconds matches the simulator's default telemetry publish interval. It felt wrong to poll faster than the data changes.
+Polling sequentially would stagger readings across sensors by accumulated network latency. `asyncio.gather` sends all 8 requests concurrently, producing a near-synchronous snapshot. 5 seconds mirrors the telemetry publish interval from the spec — it makes no sense to poll faster than the data changes.
 
 ---
 
-## The StreamConsumer: why SSE, why the reconnect loop
+## The StreamConsumer: why SSE
 
-I chose SSE over WebSocket for the stream consumer for one reason: it's a plain HTTP GET with `text/event-stream` content type. `httpx` handles it natively with `client.stream()` and `aiter_lines()`. No additional library needed, no handshake protocol to manage.
+> **Source — PDF §3.3:**
+> *"Streams can be consumed either via SSE (server sent events) or WebSocket."*
+> `GET /api/telemetry/stream/{topic}` or `WS /api/telemetry/ws?topic={topic}`
 
-Each topic gets its own independent coroutine. If one stream disconnects, only that topic's goroutine retries — the others keep running. The reconnect delay is 3 seconds, enough to avoid hammering the server during a temporary hiccup.
-
-Parsing is simple: skip lines that don't start with `data:`, strip the prefix, parse JSON. SSE spec says comments start with `:` and blank lines are heartbeats — I silently skip both.
+The spec offers both. I chose SSE because it's a plain HTTP GET — `httpx` handles it natively with no additional protocol library. Reconnect logic is also simpler: if the connection drops, you just re-issue the GET request.
 
 ---
 
 ## The Kafka producer: why send_and_wait
 
-I used `send_and_wait` instead of fire-and-forget `send`. Fire-and-forget is faster but means events can be silently dropped if the broker is under load or has a buffer full. For sensor data where a missed event might mean a missed rule trigger, I preferred the guarantee. The latency cost is negligible given the 5-second polling interval.
+> **Source — PDF §4 point 3:** *"Uses an event-driven architecture internally (message broker required)"*
+> **Source — PDF §5.2:** Rules *"must be evaluated dynamically on event arrival"* and *"trigger an actuator state update when condition is met"*
 
----
-
-## What I'd do differently
-
-The airlock primary value encoding (state-as-number) is the one decision I'm least sure about. It works, but a future version might expose a secondary sensor-level endpoint that lets the rules engine match on string values, so you could write `IF airlock_state = PRESSURIZING`. For now, the numeric encoding is a pragmatic compromise.
-
-I'd also consider a dead-letter queue or local buffer for events that fail to publish to Kafka. Currently, if the broker is temporarily unavailable, those events are lost. For a Mars habitat automation system, that's a real gap — though outside the scope of this assignment.
+If events are silently dropped, rules never fire. `send_and_wait` guarantees the broker has acknowledged the message before the producer moves on. The latency cost is negligible at a 5-second polling interval.
