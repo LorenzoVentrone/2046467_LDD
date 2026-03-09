@@ -36,11 +36,7 @@ const Icon = {
 }
 
 const BrandMark = () => (
-  <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-    <circle cx="9" cy="9" r="9" fill="white" fillOpacity="0.2" />
-    <circle cx="9" cy="9" r="5" fill="white" fillOpacity="0.9" />
-    <circle cx="9" cy="9" r="2.5" fill="white" />
-  </svg>
+  <img src="/mars_icon.svg" alt="Mars Habitat" width="32" height="32" style={{ display: 'block' }} />
 )
 
 const NAV = [
@@ -63,9 +59,7 @@ export default function Sidebar({ activeTab, onTabChange, alertCount = 0 }) {
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
-        <div className="brand-icon">
-          <BrandMark />
-        </div>
+        <BrandMark />
         <div>
           <div className="brand-text">MARS HABITAT</div>
           <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>IoT Platform</div>
