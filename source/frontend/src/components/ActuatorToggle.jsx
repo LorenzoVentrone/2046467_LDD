@@ -1,19 +1,23 @@
 import React, { useEffect, useState } from 'react'
+import { FaRegSnowflake } from "react-icons/fa";
+import { FaDroplet } from "react-icons/fa6";
+import { FaWind } from "react-icons/fa";
+import { FaFire } from "react-icons/fa";
 
 const API = import.meta.env.VITE_API_URL || ''
 
 const LABELS = {
-  cooling_fan:          'Cooling Fan',
-  entrance_humidifier:  'Entrance Humidifier',
-  hall_ventilation:     'Hall Ventilation',
-  habitat_heater:       'Habitat Heater',
+  cooling_fan: 'Cooling Fan',
+  entrance_humidifier: 'Entrance Humidifier',
+  hall_ventilation: 'Hall Ventilation',
+  habitat_heater: 'Habitat Heater',
 }
 
 const ICONS = {
-  cooling_fan:          '❄️',
-  entrance_humidifier:  '💧',
-  hall_ventilation:     '🌬️',
-  habitat_heater:       '🔥',
+  cooling_fan: <FaRegSnowflake />,
+  entrance_humidifier: <FaDroplet />,
+  hall_ventilation: <FaWind />,
+  habitat_heater: <FaFire />,
 }
 
 export default function ActuatorToggle({ actuatorId }) {
