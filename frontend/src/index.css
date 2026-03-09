@@ -934,7 +934,61 @@ body {
 .mb-md    { margin-bottom: 16px; }
 .mb-lg    { margin-bottom: 24px; }
 
-/* ── Responsive ──────────────────────────────────────────────────────── */
+/* ── Theme Toggle Button ─────────────────────────────────────────────── */
+.theme-toggle {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+
+.theme-toggle:hover {
+  background: var(--border-color);
+  color: var(--text-primary);
+}
+
+/* ── Dark Theme Overrides ────────────────────────────────────────────── */
+.app-layout[data-theme="dark"] {
+  --bg-primary:    #0a0b10;
+  --bg-secondary:  #12131a;
+  --bg-card:       #16171f;
+  --bg-card-hover: #1c1d27;
+  --bg-input:      #1e1f2a;
+
+  --border-color:  rgba(35, 36, 48, 0.9);
+  --border-light:  #2c2d3a;
+
+  --text-primary:  #e8eaed;
+  --text-secondary:#8b8fa3;
+  --text-muted:    #5c5f73;
+
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.25);
+  --shadow-sm:   0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Cards lose the lift shadow on hover in dark mode — use border highlight instead */
+.app-layout[data-theme="dark"] .stat-card:hover,
+.app-layout[data-theme="dark"] .card:hover,
+.app-layout[data-theme="dark"] .actuator-card:hover {
+  box-shadow: 0 0 0 1px var(--accent-glow), var(--shadow-card);
+  transform: translateY(-1px);
+}
+
+/* Toggle track in dark mode */
+.app-layout[data-theme="dark"] .toggle-track {
+  background: #1e1f2a;
+  border: 1px solid #2c2d3a;
+}
+
+/* Responsive ──────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .sidebar          { display: none; }
   .main-content     { padding: 16px; }

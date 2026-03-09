@@ -28,9 +28,29 @@ const TABS = {
   alerts: 'Alerts',
 }
 
+const SunIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+    <circle cx="8" cy="8" r="3" />
+    <path d="M8 1v1.5M8 13.5V15M1 8h1.5M13.5 8H15M3.05 3.05l1.06 1.06M11.89 11.89l1.06 1.06M11.89 4.11l1.06-1.06M3.05 12.95l1.06-1.06" />
+  </svg>
+)
+
+const MoonIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+    <path d="M13.5 10.5A6 6 0 0 1 5.5 2.5a6 6 0 1 0 8 8z" />
+  </svg>
+)
+
 export default function App() {
   const { sensorState, sensorHistory, alerts, eventLog, connected } = useWebSocket()
   const [activeTab, setActiveTab] = useState('overview')
+  const [theme, setTheme] = useState(() => localStorage.getItem('mars-theme') || 'light')
+
+  const toggleTheme = () => {
+    const next = theme === 'light' ? 'dark' : 'light'
+    setTheme(next)
+    localStorage.setItem('mars-theme', next)
+  }
 
   const temp     = sensorState.greenhouse_temperature
   const humidity = sensorState.entrance_humidity
@@ -38,7 +58,7 @@ export default function App() {
   const pressure = sensorState.corridor_pressure
 
   return (
-    <div className="app-layout">
+    <div className="app-layout" data-theme={theme}>
       <Sidebar
         activeTab={activeTab}
         onTabChange={setActiveTab}
@@ -54,10 +74,15 @@ export default function App() {
               Last updated: {new Date().toLocaleTimeString()} · {Object.keys(sensorState).length} sensors active
             </div>
           </div>
-          {/* Live connection indicator */}
-          <div className={`conn-badge${connected ? ' conn-badge--live' : ' conn-badge--reconnecting'}`}>
-            <span className="conn-dot" />
-            {connected ? 'LIVE' : 'RECONNECTING'}
+          {/* Theme toggle + live connection indicator */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button className="theme-toggle" onClick={toggleTheme} title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}>
+              {theme === 'light' ? <MoonIcon /> : <SunIcon />}
+            </button>
+            <div className={`conn-badge${connected ? ' conn-badge--live' : ' conn-badge--reconnecting'}`}>
+              <span className="conn-dot" />
+              {connected ? 'LIVE' : 'RECONNECTING'}
+            </div>
           </div>
         </div>
 
@@ -120,12 +145,14 @@ export default function App() {
                   title="Thermal Loop Temperature"
                   history={sensorHistory.thermal_loop || []}
                   unit="°C"
+                  theme={theme}
                 />
                 <SensorChart
                   title="Power Bus"
                   history={sensorHistory.power_bus || []}
                   color="#60a5fa"
                   unit="W"
+                  theme={theme}
                 />
               </div>
 
@@ -152,10 +179,10 @@ export default function App() {
 
               <h2 className="section-title" style={{ marginTop: 24 }}>Live Charts</h2>
               <div className="chart-grid">
-                <SensorChart title="Thermal Loop"         history={sensorHistory.thermal_loop || []}          unit="°C" />
-                <SensorChart title="Power Bus"            history={sensorHistory.power_bus || []}             color="#60a5fa" unit="W" />
-                <SensorChart title="Power Consumption"    history={sensorHistory.power_consumption || []}     color="#f59e0b" unit="W" />
-                <SensorChart title="Greenhouse Temperature" history={sensorHistory.greenhouse_temperature || []} color="#22c55e" unit="°C" />
+                <SensorChart title="Thermal Loop"           history={sensorHistory.thermal_loop || []}            unit="°C"  theme={theme} />
+                <SensorChart title="Power Bus"              history={sensorHistory.power_bus || []}               color="#60a5fa" unit="W"   theme={theme} />
+                <SensorChart title="Power Consumption"      history={sensorHistory.power_consumption || []}       color="#f59e0b" unit="W"   theme={theme} />
+                <SensorChart title="Greenhouse Temperature" history={sensorHistory.greenhouse_temperature || []}  color="#22c55e" unit="°C"  theme={theme} />
               </div>
             </>
           )}
