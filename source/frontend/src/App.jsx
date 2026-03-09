@@ -41,15 +41,37 @@ const MoonIcon = () => (
   </svg>
 )
 
+const BellIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M8 1.5a4.5 4.5 0 0 1 4.5 4.5v3.5l1 1.5H2.5L3.5 9.5V6A4.5 4.5 0 0 1 8 1.5z" />
+    <path d="M6.5 13.5a1.5 1.5 0 0 0 3 0" />
+  </svg>
+)
+
+const BellOffIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M8 1.5a4.5 4.5 0 0 1 4.5 4.5v3.5l1 1.5H2.5L3.5 9.5V6A4.5 4.5 0 0 1 8 1.5z" />
+    <path d="M6.5 13.5a1.5 1.5 0 0 0 3 0" />
+    <line x1="2" y1="2" x2="14" y2="14" />
+  </svg>
+)
+
 export default function App() {
   const { sensorState, sensorHistory, alerts, eventLog, connected } = useWebSocket()
   const [activeTab, setActiveTab] = useState('overview')
   const [theme, setTheme] = useState(() => localStorage.getItem('mars-theme') || 'light')
+  const [dnd, setDnd] = useState(() => localStorage.getItem('mars-dnd') === 'true')
 
   const toggleTheme = () => {
     const next = theme === 'light' ? 'dark' : 'light'
     setTheme(next)
     localStorage.setItem('mars-theme', next)
+  }
+
+  const toggleDnd = () => {
+    const next = !dnd
+    setDnd(next)
+    localStorage.setItem('mars-dnd', String(next))
   }
 
   const temp     = sensorState.greenhouse_temperature
@@ -74,8 +96,15 @@ export default function App() {
               Last updated: {new Date().toLocaleTimeString()} · {Object.keys(sensorState).length} sensors active
             </div>
           </div>
-          {/* Theme toggle + live connection indicator */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {/* Header controls */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button
+              className={`dnd-btn${dnd ? ' dnd-btn--active' : ''}`}
+              onClick={toggleDnd}
+              title={dnd ? 'Do not disturb: ON — click to enable alerts' : 'Do not disturb: OFF — click to silence alerts'}
+            >
+              {dnd ? <BellOffIcon /> : <BellIcon />}
+            </button>
             <button className="theme-toggle" onClick={toggleTheme} title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}>
               {theme === 'light' ? <MoonIcon /> : <SunIcon />}
             </button>
@@ -215,8 +244,8 @@ export default function App() {
         </div>
       </div>
 
-      {/* Toast notifications (always visible) */}
-      <AlertToast alerts={alerts} />
+      {/* Toast notifications — suppressed when do-not-disturb is on */}
+      <AlertToast alerts={dnd ? [] : alerts} />
     </div>
   )
 }
