@@ -8,6 +8,10 @@ import { onPipelineLog } from '../pipelineLogger'
 
 const MAX_ENTRIES = 600
 
+// Monotonic counter — guarantees unique keys even when many entries
+// arrive within the same millisecond (e.g. during history replay).
+let _seq = 0
+
 function getLogsWsUrl() {
   if (import.meta.env.VITE_WS_URL) {
     return import.meta.env.VITE_WS_URL.replace(/\/$/, '') + '/logs'
@@ -22,7 +26,7 @@ export function useLogStream() {
   const ws = useRef(null)
 
   const append = useCallback((entry) => {
-    setEntries(prev => [...prev, { ...entry, _id: Date.now() + Math.random() }].slice(-MAX_ENTRIES))
+    setEntries(prev => [...prev, { ...entry, _id: ++_seq }].slice(-MAX_ENTRIES))
   }, [])
 
   const connect = useCallback(() => {
