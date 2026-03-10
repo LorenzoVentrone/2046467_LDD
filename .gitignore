@@ -74,13 +74,13 @@ booklets/diagrams/architecture_diagram.py
 
 
 # ── Edo's stuff ──────────────────────────────────────────────────────────────────
-../FRONTEND_PITCH.md
-../FRONTEND_PITCH_v2.md
-../FRONTEND_PITCH_v3.md
-../OVERVIEW.md
-../SCHEMA_CONTRACT.md
-../global-bottom.vue
-../guidelines.pdf
+FRONTEND_PITCH.md
+FRONTEND_PITCH_v2.md
+FRONTEND_PITCH_v3.md
+OVERVIEW.md
+SCHEMA_CONTRACT.md
+guidelines.pdf
+global-bottom.vue
 mars_documentation.pdf
 mars_habitat_presentation.pptx
 mars_icon_new.png
