@@ -68,3 +68,6 @@ architecture_diagram.py
 # ── OS ────────────────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
+
+# ── Diagrams ──────────────────────────────────────────────────────────────────
+booklets/diagrams/architecture_diagram.py
