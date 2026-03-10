@@ -71,3 +71,21 @@ Thumbs.db
 
 # ── Diagrams ──────────────────────────────────────────────────────────────────
 booklets/diagrams/architecture_diagram.py
+
+
+# ── Edo's stuff ──────────────────────────────────────────────────────────────────
+../FRONTEND_PITCH.md
+../FRONTEND_PITCH_v2.md
+../FRONTEND_PITCH_v3.md
+../OVERVIEW.md
+../SCHEMA_CONTRACT.md
+../global-bottom.vue
+../guidelines.pdf
+mars_documentation.pdf
+mars_habitat_presentation.pptx
+mars_icon_new.png
+package-lock.json
+package.json
+presentazione.ppt
+slides copy.md
+slides.md
