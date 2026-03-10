@@ -1063,6 +1063,15 @@ body {
   background: #1e1f2a;
   border: 1px solid #2c2d3a;
 }
+.app-layout[data-theme="dark"] .toggle-track.on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Actuator icons — invert in dark mode (filter: invert = 255-x per channel) */
+[data-theme="dark"] .actuator-card svg {
+  filter: invert(1);
+}
 
 /* Responsive ──────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
