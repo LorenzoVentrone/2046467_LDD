@@ -4,9 +4,10 @@ const HISTORY_SIZE = 30
 
 function getWsUrl() {
   if (import.meta.env.VITE_WS_URL) {
-    return import.meta.env.VITE_WS_URL
+    return import.meta.env.VITE_WS_URL.replace(/\/$/, '')
   }
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  // If running via standard proxy (Nginx or Vite), just use the origin
   return `${proto}//${window.location.host}`
 }
 
