@@ -9,6 +9,7 @@ import RuleManager from './components/RuleManager'
 import EventLog from './components/EventLog'
 import AlertToast from './components/AlertToast'
 import AlertPanel from './components/AlertPanel'
+import DemoTerminal from './components/DemoTerminal'
 
 const REST_SENSORS = [
   'greenhouse_temperature', 'entrance_humidity', 'co2_hall', 'corridor_pressure',
@@ -56,12 +57,20 @@ const BellOffIcon = () => (
   </svg>
 )
 
+const TerminalIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="2 4 7 8 2 12" />
+    <line x1="8" y1="12" x2="14" y2="12" />
+  </svg>
+)
+
 export default function App() {
   const { sensorState, sensorHistory, alerts, eventLog, connected } = useWebSocket()
   const [activeTab, setActiveTab] = useState('overview')
   const [theme, setTheme] = useState(() => localStorage.getItem('mars-theme') || 'light')
   const [dnd, setDnd] = useState(() => localStorage.getItem('mars-dnd') === 'true')
   const [seenAlertCount, setSeenAlertCount] = useState(0)
+  const [showTerminal,   setShowTerminal]   = useState(true)   // open by default for demo
 
   // Clear the badge whenever the user is on the Alerts tab
   useEffect(() => {
@@ -104,6 +113,14 @@ export default function App() {
           </div>
           {/* Header controls */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button
+              className={`theme-toggle${showTerminal ? ' terminal-btn--active' : ''}`}
+              onClick={() => setShowTerminal(s => !s)}
+              title={showTerminal ? 'Hide pipeline terminal' : 'Show pipeline terminal'}
+              style={{ fontFamily: 'monospace', fontSize: 13 }}
+            >
+              <TerminalIcon />
+            </button>
             <button
               className={`dnd-btn${dnd ? ' dnd-btn--active' : ''}`}
               onClick={toggleDnd}
@@ -252,6 +269,9 @@ export default function App() {
 
       {/* Toast notifications — suppressed when do-not-disturb is on */}
       <AlertToast alerts={dnd ? [] : alerts} />
+
+      {/* Pipeline monitor terminal — visible by default for demo */}
+      {showTerminal && <DemoTerminal onClose={() => setShowTerminal(false)} />}
     </div>
   )
 }

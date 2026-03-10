@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import httpx
 
 from database import get_rules_for_sensor, insert_rule_log
+from pipeline_logger import pipeline_logger
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +50,14 @@ async def evaluate(event: dict) -> list[dict]:
         logger.warning("Non-numeric value %r for sensor %s: %s", value, event["sensor_id"], exc)
         return alerts
 
+    sensor_id = event["sensor_id"]
+    unit      = event.get("unit", "")
+
+    await pipeline_logger.log(
+        "RULES",
+        f"→ Evaluating {len(rules)} rule(s): {sensor_id} = {fvalue:.2f} {unit}",
+    )
+
     now = time.monotonic()
     for rule in rules:
         op = OPS.get(rule["operator"])
@@ -68,9 +77,22 @@ async def evaluate(event: dict) -> list[dict]:
         last = _last_fired.get(rule["id"], 0.0)
         if now - last < COOLDOWN_SECONDS:
             logger.debug("Rule %s in cooldown, skipping", rule["id"][:8])
+            await pipeline_logger.log(
+                "RULES",
+                f"◷ Cooldown: {sensor_id} {rule['operator']} {rule['threshold']} "
+                f"→ {rule['actuator_id']} (next in {COOLDOWN_SECONDS - (now - last):.0f}s)",
+                "DEBUG",
+            )
             continue
 
         _last_fired[rule["id"]] = now
+
+        await pipeline_logger.log(
+            "RULES",
+            f"▲ Rule FIRED: IF {sensor_id} {rule['operator']} {rule['threshold']} "
+            f"THEN {rule['actuator_id']} → {rule['action']}  (value={fvalue:.2f})",
+            "WARN",
+        )
 
         # Trigger the actuator
         await _trigger_actuator(rule["actuator_id"], rule["action"], rule, event)
@@ -101,13 +123,27 @@ async def evaluate(event: dict) -> list[dict]:
 
 async def _trigger_actuator(actuator_id: str, action: str, rule: dict, event: dict):
     url = f"{SIMULATOR_URL}/api/actuators/{actuator_id}"
+    await pipeline_logger.log(
+        "ACTUATOR",
+        f'→ POST {url}  body={{"state":"{action}"}}',
+    )
     try:
         resp = await _http_client.post(url, json={"state": action})
         resp.raise_for_status()
+        await pipeline_logger.log(
+            "ACTUATOR",
+            f"✔ {actuator_id} set to {action}",
+            "SUCCESS",
+        )
         logger.info(
             "Rule fired: IF %s %s %s THEN %s → %s (event value=%.2f)",
             rule["sensor_id"], rule["operator"], rule["threshold"],
             actuator_id, action, event["value"],
         )
     except Exception as exc:
+        await pipeline_logger.log(
+            "ACTUATOR",
+            f"✖ Failed to trigger {actuator_id}: {exc}",
+            "ERROR",
+        )
         logger.warning("Failed to trigger actuator %s: %s", actuator_id, exc)

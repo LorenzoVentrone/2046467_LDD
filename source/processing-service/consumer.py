@@ -8,6 +8,7 @@ from aiokafka import AIOKafkaConsumer
 import state_cache
 import rules_engine
 from websocket_manager import manager
+from pipeline_logger import pipeline_logger
 
 logger = logging.getLogger(__name__)
 
@@ -42,25 +43,43 @@ async def consume_loop():
             await asyncio.sleep(_RETRY_DELAY)
 
     logger.info("Consumer started on topic '%s'", TOPIC)
+    await pipeline_logger.log("PROCESSING", f"← Kafka consumer ready on '{TOPIC}'", "SUCCESS")
+
     try:
         async for msg in consumer:
             try:
-                event = msg.value
+                event     = msg.value
+                sensor_id = event.get("sensor_id", "unknown")
+                value     = event.get("value")
+                unit      = event.get("unit", "")
+
+                # ── Pipeline: received from Kafka ─────────────────────────────
+                await pipeline_logger.log(
+                    "PROCESSING",
+                    f"← Kafka msg: {sensor_id} = {float(value):.2f} {unit}",
+                )
+
                 await state_cache.update(event)
 
-                # Evaluate automation rules — returns alert payloads for any that fired
+                # ── Evaluate automation rules ─────────────────────────────────
                 try:
                     alerts = await rules_engine.evaluate(event)
                 except Exception as exc:
-                    logger.error("Rule evaluation failed for event %s: %s", event.get("sensor_id"), exc)
+                    logger.error("Rule evaluation failed for event %s: %s", sensor_id, exc)
                     alerts = []
 
-                # Broadcast the sensor event to all connected dashboards
+                # ── Broadcast sensor event to all connected dashboards ─────────
                 await manager.broadcast(event)
 
-                # Broadcast each alert so the frontend shows real-time notifications
+                # ── Broadcast each alert and log it ───────────────────────────
                 for alert in alerts:
                     await manager.broadcast(alert)
+                    await pipeline_logger.log(
+                        "WEBSOCKET",
+                        f"→ Alert broadcast: {alert['sensor_id']} {alert['operator']} "
+                        f"{alert['threshold']} → {alert['actuator_id']} {alert['action']}",
+                        "WARN",
+                    )
                     logger.info(
                         "Alert broadcast: IF %s %s %s THEN %s → %s (value=%.2f)",
                         alert["sensor_id"], alert["operator"], alert["threshold"],

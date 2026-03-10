@@ -16,6 +16,7 @@ import database
 import rules_engine
 from consumer import consume_loop
 from websocket_manager import manager
+from pipeline_logger import pipeline_logger
 
 logging.basicConfig(
     level=logging.INFO,
@@ -25,12 +26,20 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 SIMULATOR_URL = os.getenv("SIMULATOR_URL", "http://localhost:8080")
+KAFKA_BROKER  = os.getenv("KAFKA_BROKER",  "localhost:9092")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await database.init_db()
     await database.seed_permanent_rules()
+
+    # Startup pipeline log — stored in history so terminal clients see it on connect
+    await pipeline_logger.log("PROCESSING", "→ Processing service starting up", "SUCCESS")
+    await pipeline_logger.log("PROCESSING", f"→ Kafka broker: {KAFKA_BROKER}")
+    await pipeline_logger.log("PROCESSING", f"→ Simulator URL: {SIMULATOR_URL}")
+    await pipeline_logger.log("PROCESSING", "→ Database ready — permanent rules seeded")
+
     task = asyncio.create_task(consume_loop())
     task.add_done_callback(
         lambda t: logger.error("Consumer task died: %s", t.exception())
@@ -89,6 +98,15 @@ class ActuatorCommand(BaseModel):
 
 @app.post("/api/actuators/{actuator_id}")
 async def set_actuator(actuator_id: str, cmd: ActuatorCommand):
+    # ── Pipeline logs for the manual actuator flow ─────────────────────────
+    await pipeline_logger.log(
+        "PROCESSING",
+        f"→ Actuator command received: {actuator_id} → {cmd.state}",
+    )
+    await pipeline_logger.log(
+        "PROCESSING",
+        f"→ Proxying to simulator: POST /api/actuators/{actuator_id}",
+    )
     async with httpx.AsyncClient(timeout=5) as client:
         try:
             resp = await client.post(
@@ -97,9 +115,24 @@ async def set_actuator(actuator_id: str, cmd: ActuatorCommand):
             )
             resp.raise_for_status()
         except httpx.HTTPStatusError as exc:
+            await pipeline_logger.log(
+                "SIMULATOR",
+                f"✖ HTTP {exc.response.status_code} from simulator for {actuator_id}",
+                "ERROR",
+            )
             raise HTTPException(status_code=exc.response.status_code, detail=exc.response.text)
         except httpx.RequestError as exc:
+            await pipeline_logger.log(
+                "SIMULATOR",
+                f"✖ Simulator unreachable: {exc}",
+                "ERROR",
+            )
             raise HTTPException(status_code=502, detail=f"Simulator unreachable: {exc}")
+    await pipeline_logger.log(
+        "SIMULATOR",
+        f"✔ {actuator_id} acknowledged: {cmd.state}",
+        "SUCCESS",
+    )
     return resp.json()
 
 
@@ -148,11 +181,35 @@ async def get_rule_logs(limit: int = 50):
     return await database.get_recent_logs(limit)
 
 
-# ── WebSocket ──────────────────────────────────────────────────────────────────
+# ── Pipeline log ingest (from ingestion-service) ───────────────────────────────
+
+class PipelineLogEntry(BaseModel):
+    service: str
+    message: str
+    level: str = "INFO"
+
+
+@app.post("/api/pipeline-log", status_code=200)
+async def receive_pipeline_log(body: PipelineLogEntry):
+    """Accepts log events from other services (e.g. ingestion-service) and
+    broadcasts them to all /ws/logs clients."""
+    await pipeline_logger.log(
+        service=body.service,
+        message=body.message,
+        level=body.level,
+    )
+    return {"ok": True}
+
+
+# ── WebSocket: sensor data & alerts ───────────────────────────────────────────
 
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await manager.connect(ws)
+    await pipeline_logger.log(
+        "WEBSOCKET",
+        f"→ Dashboard client connected ({len(manager._connections)} total)",
+    )
     snapshot = await state_cache.get_all()
     for event in snapshot.values():
         await ws.send_text(json.dumps(event))
@@ -161,6 +218,20 @@ async def websocket_endpoint(ws: WebSocket):
             await ws.receive_text()  # keep alive / ignore client messages
     except WebSocketDisconnect:
         manager.disconnect(ws)
+
+
+# ── WebSocket: live pipeline log stream ───────────────────────────────────────
+
+@app.websocket("/ws/logs")
+async def websocket_logs(ws: WebSocket):
+    """Streams pipeline_log events to the DemoTerminal.
+    On connect, replays history so the client sees recent events immediately."""
+    await pipeline_logger.connect(ws)
+    try:
+        while True:
+            await ws.receive_text()  # keep alive
+    except WebSocketDisconnect:
+        pipeline_logger.disconnect(ws)
 
 
 if __name__ == "__main__":

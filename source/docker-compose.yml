@@ -52,6 +52,7 @@ services:
       - SIMULATOR_URL=http://simulator:8080
       - KAFKA_BROKER=redpanda:9092
       - POLL_INTERVAL=5
+      - PROCESSING_SERVICE_URL=http://processing-service:8001
     depends_on:
       simulator:
         condition: service_healthy

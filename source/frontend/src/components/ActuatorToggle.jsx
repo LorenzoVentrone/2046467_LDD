@@ -3,6 +3,7 @@ import { FaRegSnowflake } from "react-icons/fa";
 import { FaDroplet } from "react-icons/fa6";
 import { FaWind } from "react-icons/fa";
 import { FaFire } from "react-icons/fa";
+import { emitPipelineLog } from '../pipelineLogger'
 
 const API = import.meta.env.VITE_API_URL || ''
 
@@ -48,8 +49,14 @@ export default function ActuatorToggle({ actuatorId }) {
   }, [actuatorId])
 
   const toggle = async () => {
-    const next = state === 'ON' ? 'OFF' : 'ON'
+    const next  = state === 'ON' ? 'OFF' : 'ON'
+    const label = LABELS[actuatorId] || actuatorId
     setLoading(true)
+
+    // ── User story: manual actuator override ──────────────────────────────
+    emitPipelineLog({ message: `► User toggled ${label} → ${next}` })
+    emitPipelineLog({ message: `→ POST /api/actuators/${actuatorId}  {"state":"${next}"}` })
+
     try {
       const resp = await fetch(`${API}/api/actuators/${actuatorId}`, {
         method: 'POST',
@@ -59,8 +66,22 @@ export default function ActuatorToggle({ actuatorId }) {
       if (resp.ok) {
         setState(next)
         setLastChanged(new Date())
+        emitPipelineLog({
+          message: `✔ ${label} is now ${next}  (response: 200 OK)`,
+          level: 'SUCCESS',
+        })
+      } else {
+        emitPipelineLog({
+          message: `✖ Server returned ${resp.status} for ${actuatorId}`,
+          level: 'ERROR',
+        })
       }
-    } catch (_) { }
+    } catch (err) {
+      emitPipelineLog({
+        message: `✖ Network error toggling ${actuatorId}: ${err.message}`,
+        level: 'ERROR',
+      })
+    }
     setLoading(false)
   }
 

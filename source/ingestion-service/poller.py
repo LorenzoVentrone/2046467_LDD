@@ -3,6 +3,7 @@ import logging
 import httpx
 from normalizer import normalize
 from kafka_producer import Producer
+from log_reporter import log_reporter
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,16 @@ class Poller:
         async with httpx.AsyncClient(timeout=10) as client:
             logger.info("Poller started — polling %d sensors every %ds",
                         len(REST_SENSORS), self._interval)
+            log_reporter.log(
+                "INGESTION",
+                f"→ Poller started — {len(REST_SENSORS)} REST sensors, interval={self._interval}s",
+                "SUCCESS",
+            )
             while True:
+                log_reporter.log(
+                    "INGESTION",
+                    f"→ Poll cycle: querying {len(REST_SENSORS)} REST endpoints on simulator",
+                )
                 tasks = [
                     self._poll_one(client, sensor_id, schema)
                     for sensor_id, schema in REST_SENSORS.items()
@@ -44,7 +54,23 @@ class Poller:
             resp.raise_for_status()
             payload = resp.json()
             event = normalize(sensor_id, "REST", raw_schema, payload)
+
+            # ── Pipeline logs ─────────────────────────────────────────────────
+            log_reporter.log(
+                "INGESTION",
+                f"← {sensor_id} = {event['value']:.2f} {event['unit']}  (REST)",
+            )
+            log_reporter.log(
+                "KAFKA",
+                f"→ Publishing to normalized.sensor.events: {sensor_id}",
+            )
+
             await self._producer.send(event)
             logger.debug("Polled %s → %.2f %s", sensor_id, event["value"], event["unit"])
         except Exception as exc:
+            log_reporter.log(
+                "INGESTION",
+                f"✖ Failed to poll {sensor_id}: {exc}",
+                "ERROR",
+            )
             logger.warning("Failed to poll %s: %s", sensor_id, exc)

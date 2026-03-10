@@ -1064,6 +1064,13 @@ body {
   border: 1px solid #2c2d3a;
 }
 
+/* Terminal toggle button ───────────────────────────────────────────── */
+.terminal-btn--active {
+  background: var(--accent-bg);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 /* Responsive ──────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .sidebar          { display: none; }
